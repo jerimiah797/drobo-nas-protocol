@@ -36,8 +36,20 @@ magnet:?xt=urn:btih:f69847e6f62d92dd5871554e3136e0c2410a1e62&dn=updates.drobo.co
 - mirrored 2022-11-25, before the servers went down
 
 Several of the trackers baked into it are themselves dead now (`9.rarbg.to`,
-predictably). It relies on peers. **If you get it, keep seeding it** — this is a
-small population of people keeping each other's hardware alive.
+predictably), so it relies on peers.
+
+It is alive. I've been seeding it since October 2023, and in those 2.9 years it
+has uploaded **310 GiB — about 28 complete copies, roughly ten a year.**
+
+Sit with that number for a second. Ten people a year, worldwide, have found the
+only public mirror of firmware for a product that sold in the hundreds of
+thousands. Not because demand is low, but because the only reference to it was
+buried in the sub-comments of one Reddit thread. That's the entire reason this
+article exists.
+
+**If you get it, keep seeding it.** This is a small population of people keeping
+each other's hardware alive, and the archive only survives as long as somebody is
+sharing it.
 
 Extracted, it's 13 GB and 1,205 files:
 
