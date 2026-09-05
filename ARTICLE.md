@@ -7,9 +7,9 @@ Storcentric — which owned Drobo — went bankrupt in 2023. The update servers 
 dark. Drobo Dashboard, the Windows application that was the only way to see your
 drives, talks to a support infrastructure that isn't there any more.
 
-And yet the hardware works. Mine has been in continuous service since 2018 —
-eight years, three of them after the company that built it ceased to exist —
-and it currently holds 19 TiB without complaint.
+And yet the hardware works. Mine has been in continuous service since 2019 —
+seven years, three of them after the company that built it ceased to exist — and
+it currently holds 19 TiB without complaint.
 
 This is what I've worked out about keeping one alive: where to get the firmware
 and apps now that the servers are gone, how to add and supervise your own
