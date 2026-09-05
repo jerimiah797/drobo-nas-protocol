@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Read per-disk status from a Drobo NAS, over its own management protocol.
+
+READ-ONLY BY CONSTRUCTION. This opens a socket, reads exactly one frame, and
+closes. It never sends a byte to the daemon. That matters: the same command enum
+that carries the harmless getters also carries eCmdInsertDrive and
+eCmdRemoveDrive, so a tool that could send arbitrary commands would be a very
+different proposition from one that cannot send anything at all.
+
+Tested against a single Drobo 5N2 on firmware 4.3.1. Other NAS models probably
+speak the same protocol; that is untested.
+"""
+import argparse, json, socket, struct, sys
+import xml.etree.ElementTree as ET
+
+MAGIC = b"DRINASD\x00"
+HEADER = 16
+MAX_FRAME = 8 * 1024 * 1024
+
+
+def read_frame(host, port=5000, timeout=20.0):
+    with socket.create_connection((host, port), timeout=timeout) as s:
+        s.settimeout(timeout)
+
+        def need(n):
+            buf = b""
+            while len(buf) < n:
+                chunk = s.recv(n - len(buf))
+                if not chunk:
+                    raise IOError(f"connection closed after {len(buf)} of {n} bytes")
+                buf += chunk
+            return buf
+
+        hdr = need(HEADER)
+        if hdr[:8] != MAGIC:
+            raise IOError(f"not a Drobo management port: magic {hdr[:8]!r}")
+        # BIG-endian. Read this little-endian and a 7 KB frame looks like ~2.7 GB,
+        # so the recv loop blocks until the timeout instead of failing.
+        (length,) = struct.unpack_from(">I", hdr, 12)
+        if not 0 < length <= MAX_FRAME:
+            raise IOError(f"implausible frame length {length}")
+        return hdr[8:12], need(length)
+
+
+def parse(body):
+    # NUL-terminated, and the length includes the NUL. Without this an XML parser
+    # reports "not well-formed" at a line past the closing root tag.
+    root = ET.fromstring(body.rstrip(b"\x00").decode("utf-8", "replace"))
+    g = lambda el, tag, d="": (el.findtext(tag) or d).strip()
+
+    disks = []
+    for el in root.iter():
+        if el.tag.startswith("n") and el.tag[1:].isdigit() and el.find("mSlotNumber") is not None:
+            disks.append({
+                "slot": int(g(el, "mSlotNumber", "-1")),
+                "make": " ".join(g(el, "mMake").split()),
+                "serial": g(el, "mSerial"),
+                "firmware": g(el, "mDiskFwRev"),
+                "capacity_bytes": int(g(el, "mPhysicalCapacity", "0")),
+                "type": int(g(el, "mDiskType", "0")),
+                "state": int(g(el, "mDiskState", "0")),
+                "status": int(g(el, "mStatus", "0")),
+                "errors": int(g(el, "mErrorCount", "0")),
+                "ssd_life_pct": int(g(el, "SSDLifeRemaining", "0")),
+            })
+    disks.sort(key=lambda d: d["slot"])
+
+    def top(tag, cast=str, default=None):
+        v = root.findtext(f".//{tag}")
+        return cast(v.strip()) if v is not None and v.strip() else default
+
+    return {
+        "model": top("mModel"),
+        "disk_pack_id": top("mDiskPackID"),
+        "disk_pack_status": top("mDiskPackStatus", int),
+        "capacity_total_bytes": top("mTotalCapacityProtected", int),
+        "capacity_used_bytes": top("mUsedCapacityProtected", int),
+        "capacity_free_bytes": top("mFreeCapacityProtected", int),
+        "disks": disks,
+    }
+
+
+TYPE = {0: "HDD", 4: "mSATA"}
+
+
+def human(info):
+    tb = lambda n: f"{n/1_000_000_000_000:.2f} TB" if n else "-"
+    out = [f'{info["model"] or "Drobo"}   pack {info["disk_pack_id"] or "?"}   '
+           f'status {info["disk_pack_status"]}']
+    tot, used = info["capacity_total_bytes"], info["capacity_used_bytes"]
+    if tot:
+        out.append(f'  capacity {tb(used)} used of {tb(tot)} protected  ({used/tot*100:.1f}%)')
+    out.append("")
+    out.append(f'  {"slot":<5}{"type":<7}{"capacity":>10}  {"model":<28}{"serial":<22}{"fw":<9}{"err":>4}')
+    for d in info["disks"]:
+        out.append(f'  {d["slot"]:<5}{TYPE.get(d["type"], d["type"]):<7}{tb(d["capacity_bytes"]):>10}  '
+                   f'{d["make"][:27]:<28}{d["serial"][:21]:<22}{d["firmware"][:8]:<9}{d["errors"]:>4}')
+    # Stated rather than silently omitted: the field exists and is useless here.
+    out.append("")
+    out.append("  note: mTemperature is reported by the device but reads 0 on all slots")
+    return "\n".join(out)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Read-only Drobo NAS status over TCP 5000")
+    ap.add_argument("host")
+    ap.add_argument("--port", type=int, default=5000)
+    ap.add_argument("--timeout", type=float, default=20.0)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--raw", action="store_true", help="print the XML as received")
+    a = ap.parse_args()
+    try:
+        _ver, body = read_frame(a.host, a.port, a.timeout)
+    except (OSError, IOError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    if a.raw:
+        sys.stdout.write(body.rstrip(b"\x00").decode("utf-8", "replace"))
+        return 0
+    try:
+        info = parse(body)
+    except Exception as e:
+        print(f"error: could not parse frame: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(info, indent=2) if a.json else human(info))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
