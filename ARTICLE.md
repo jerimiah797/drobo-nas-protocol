@@ -250,6 +250,28 @@ Different transport, different product line. Not a fork.
 
 ---
 
+## 7. The part I haven't done: authenticating
+
+Everything above is read-only in a specific way — the tool never sends a
+command. It opens the socket and reads the document `nasd` volunteers. That is
+one behaviour out of 105, and 42 of those are `Get*`.
+
+Two of the others are `eCmdAuthenticateUser` and `eCmdDeviceLogin`. The binary
+also references PAM and `/etc/shadow`, which fits what Dashboard does when it
+asks for the admin password before showing you services, shares and settings.
+So there is a whole authenticated surface here that I have not touched.
+
+I'm not going to guess at it. The same enum holds `Format`, `Remove` and
+`Force` verbs, and mine is a live array with 19 TiB on it — fuzzing a storage
+daemon is how people lose arrays. The honest way in is to put a working
+Dashboard session on the wire and read the framing off a real exchange rather
+than inferring it from a `strings` dump. There is a second listener on **5001**
+that I also can't account for yet.
+
+That's the next article.
+
+---
+
 ## What I'd tell you if you own one of these
 
 Keep it running, but don't build your future on it. Mine is healthy — five drives,
