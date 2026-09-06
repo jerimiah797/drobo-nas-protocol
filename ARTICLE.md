@@ -264,5 +264,5 @@ drives were visible all along.
 
 ---
 
-*Tool and protocol notes: [link to repo]. Tested against one Drobo 5N2 on
+*Tool and protocol notes: [github.com/jerimiah797/drobo-nas-protocol](https://github.com/jerimiah797/drobo-nas-protocol). Tested against one Drobo 5N2 on
 firmware 4.3.1 — corrections from other models very welcome.*
